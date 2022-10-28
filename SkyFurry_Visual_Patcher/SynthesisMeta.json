@@ -1,0 +1,10 @@
+{
+    "Nickname": "SF_Visual_Patcher",
+    "Visibility": "Visible",
+    "OneLineDescription": "Forwards SkyFurry visuals.",
+    "LongDescription": "- Forwards visuals from SkyFurry, keeps all non-visual records from the winning override.",
+    "PreferredAutoVersioning": "Default",
+    "RequiredMods": [
+      "SkyFurry.esp"
+    ]
+  }
