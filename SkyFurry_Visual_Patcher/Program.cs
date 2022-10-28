@@ -52,51 +52,54 @@ namespace SkyFurry_Visual_Patcher {
                 var modFormIDs = mod.Npcs.Select(x => x.FormKey).ToList();
                 var winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<INpcGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                 ModIndex++;
-                System.Console.WriteLine("\nImporting visuals from: " + modNames[ModIndex]);
-                if (mod.Npcs.Count > 0) {
-                    foreach (INpcGetter npc in mod.Npcs) {
-                        if (processed % 10 == 0) {
-                            System.Console.WriteLine(processed + "/" + total + " Npcs");
+                //sometimes, it tries to run on itself for some reason
+                if (!modNames[ModIndex].ToLower().Equals("synthesis.esp")) {
+                    System.Console.WriteLine("\nImporting visuals from: " + modNames[ModIndex]);
+                    if (mod.Npcs.Count > 0) {
+                        foreach (INpcGetter npc in mod.Npcs) {
+                            if (processed % 10 == 0) {
+                                System.Console.WriteLine(processed + "/" + total + " Npcs");
+                            }
+                            var winningOverride = winningOverrides.Where(x => x.FormKey == npc.FormKey).First();
+                            var patchNpc = state.PatchMod.Npcs.GetOrAddAsOverride(winningOverride);
+
+                            //copy texture lighting
+                            patchNpc.TextureLighting = npc.TextureLighting;
+
+                            //copy tint layers
+                            patchNpc.TintLayers.Clear();
+                            foreach (ITintLayerGetter tint in npc.TintLayers) {
+                                patchNpc.TintLayers.Add(tint.DeepCopy());
+                            }
+
+                            //copy head parts
+                            patchNpc.HeadParts.SetTo(npc.HeadParts);
+
+                            //copy head textures
+                            patchNpc.HeadTexture.SetTo(npc.HeadTexture);
+
+                            //copy face morph
+                            if (npc.FaceMorph != null) {
+                                patchNpc.FaceMorph = npc.FaceMorph.DeepCopy();
+                            }
+
+                            //copy hair color
+                            patchNpc.HairColor.SetTo(npc.HairColor);
+
+                            //copy race
+                            patchNpc.Race.SetTo(npc.Race);
+                            if (patchNpc.Equals(npc)) {
+                                state.PatchMod.Npcs.Remove(npc);
+                                ignored++;
+                            }
+                            processed++;
                         }
-                        var winningOverride = winningOverrides.Where(x => x.FormKey == npc.FormKey).First();
-                        var patchNpc = state.PatchMod.Npcs.GetOrAddAsOverride(winningOverride);
-
-                        //copy texture lighting
-                        patchNpc.TextureLighting = npc.TextureLighting;
-
-                        //copy tint layers
-                        patchNpc.TintLayers.Clear();
-                        foreach (ITintLayerGetter tint in npc.TintLayers) {
-                            patchNpc.TintLayers.Add(tint.DeepCopy());
-                        }
-
-                        //copy head parts
-                        patchNpc.HeadParts.SetTo(npc.HeadParts);
-
-                        //copy head textures
-                        patchNpc.HeadTexture.SetTo(npc.HeadTexture);
-
-                        //copy face morph
-                        if (npc.FaceMorph != null) {
-                            patchNpc.FaceMorph = npc.FaceMorph.DeepCopy();
-                        }
-
-                        //copy hair color
-                        patchNpc.HairColor.SetTo(npc.HairColor);
-
-                        //copy race
-                        patchNpc.Race.SetTo(npc.Race);
-                        if (patchNpc.Equals(npc)) {
-                            state.PatchMod.Npcs.Remove(npc);
-                            ignored++;
-                        }
-                        processed++;
                     }
+                    else {
+                        System.Console.WriteLine("No NPCs found");
+                    }
+                    System.Console.WriteLine("Ignoring " + ignored + " unchanged NPCs");
                 }
-                else {
-                    System.Console.WriteLine("No NPCs found");
-                }
-                System.Console.WriteLine("Ignoring " + ignored + " unchanged NPCs");
             }
         }
     }
