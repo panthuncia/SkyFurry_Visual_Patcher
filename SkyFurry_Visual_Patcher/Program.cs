@@ -75,6 +75,11 @@ namespace SkyFurry_Visual_Patcher {
                             //copy head parts
                             patchNpc.HeadParts.SetTo(npc.HeadParts);
 
+                            //copy face parts
+                            if (npc.FaceParts is not null) {
+                                patchNpc.FaceParts = npc.FaceParts.DeepCopy();
+                            }
+
                             //copy head textures
                             patchNpc.HeadTexture.SetTo(npc.HeadTexture);
 
