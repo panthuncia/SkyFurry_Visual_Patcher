@@ -98,6 +98,12 @@ namespace SkyFurry_Visual_Patcher {
                                 ignored++;
                             }
                             processed++;
+
+                            //copy weight
+                            patchNpc.Weight = npc.Weight;
+
+                            //copy height
+                            patchNpc.Height = npc.Height;
                         }
                     }
                     else {
