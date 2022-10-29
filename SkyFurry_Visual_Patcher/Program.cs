@@ -17,6 +17,11 @@ namespace SkyFurry_Visual_Patcher {
         }
 
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+            patchVisuals(state);
+            patchFlowingFur(state);
+        }
+
+        private static void patchVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //check for SkyFurry
             ISkyrimModGetter? SkyFurry = state.LoadOrder[state.LoadOrder.Keys.Where(x => ((string)x.FileName).ToLower() == "SkyFurry.esp".ToLower()).ToList().First()].Mod;
 
@@ -26,21 +31,7 @@ namespace SkyFurry_Visual_Patcher {
             }
             System.Console.WriteLine("Patching base SkyFurry visuals\n");
             //get list of mods which inherit from SkyFurry, as these may contain NPCs we need to patch
-            List<ISkyrimModGetter> modsToPatch = new();
-            List<String> modNames = new();
-            modsToPatch.Add(SkyFurry);
-            modNames.Add("SkyFurry.esp");
-            foreach (ModKey modName in state.LoadOrder.Keys.ToList()) {
-                var mod = state.LoadOrder[modName].Mod;
-                if (mod is not null)
-                    foreach (IMasterReferenceGetter master in mod.MasterReferences) {
-                        //list mods that inherit from SkyFurry and are not synthesis.esp
-                        if (master.Master.ToString().Equals("SkyFurry.esp") && !(modName.ToString().ToLower().Equals("synthesis.esp") || modName.ToString().ToLower().Equals("requiem for the indifferent.esp"))) {
-                            modsToPatch.Add(mod);
-                            modNames.Add(modName.ToString());
-                        }
-                    }
-            }
+            (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry.esp", SkyFurry);
             System.Console.WriteLine("\nForwarding visuals from:");
             foreach (String modName in modNames) {
                 System.Console.WriteLine(modName);
@@ -114,6 +105,9 @@ namespace SkyFurry_Visual_Patcher {
                 }
                 System.Console.WriteLine("Ignoring " + ignored + " unchanged NPCs");
             }
+        }
+
+        private static void patchFlowingFur(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //Now check for flowing fur addon and forward changes from it and anything that inherits from it
             ISkyrimModGetter? FlowingFur = state.LoadOrder[state.LoadOrder.Keys.Where(x => ((string)x.FileName).ToLower() == "SkyFurry_FlowingFur.esp".ToLower()).ToList().First()].Mod;
             System.Console.WriteLine("\nChecking for flowing fur...");
@@ -126,8 +120,8 @@ namespace SkyFurry_Visual_Patcher {
                         furTypes.Add(furType.EditorID.ToString());
                     }
                 }
-                (modNames, modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
-                ModIndex = -1;
+                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
+                int ModIndex = -1;
                 foreach (ISkyrimModGetter mod in modsToPatch) {
                     int processed = 0;
                     int ignored = 0;
@@ -147,7 +141,7 @@ namespace SkyFurry_Visual_Patcher {
                                 List<IOutfitTargetGetter> fursToRemove = new();
                                 foreach (IFormLinkGetter<IOutfitTargetGetter> itemForm in outfit.Items) {
                                     IOutfitTargetGetter? item = itemForm.TryResolve(state.LinkCache);
-                                    if (item is not null && item.EditorID is not null && furTypes.Contains(item.EditorID)){
+                                    if (item is not null && item.EditorID is not null && furTypes.Contains(item.EditorID)) {
                                         //Apparently the item list can be null, so if we need to add fur we need to check for this
                                         if (patchOutfit.Items is null) {
                                             patchOutfit.Items = new ExtendedList<IFormLinkGetter<IOutfitTargetGetter>>();
@@ -160,6 +154,12 @@ namespace SkyFurry_Visual_Patcher {
                                             }
                                         }
                                         patchOutfit.Items.Add(itemForm);
+                                    }
+                                }
+                                //remove duplicate furs
+                                foreach (IOutfitTargetGetter fur in fursToRemove) {
+                                    if (patchOutfit.Items is not null) {
+                                        patchOutfit.Items.Remove(fur);
                                     }
                                 }
                             }
