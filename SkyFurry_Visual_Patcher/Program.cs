@@ -92,17 +92,21 @@ namespace SkyFurry_Visual_Patcher {
 
                         //copy race
                         patchNpc.Race.SetTo(npc.Race);
-                        if (patchNpc.Equals(npc)) {
-                            state.PatchMod.Npcs.Remove(npc);
-                            ignored++;
-                        }
-                        processed++;
 
                         //copy weight
                         patchNpc.Weight = npc.Weight;
 
                         //copy height
                         patchNpc.Height = npc.Height;
+
+
+                        //remove unchanged NPCs
+                        if (patchNpc.Equals(winningOverride)) {
+                            state.PatchMod.Npcs.Remove(npc);
+                            ignored++;
+                        }
+
+                        processed++;
                     }
                 }
                 else {
@@ -123,48 +127,55 @@ namespace SkyFurry_Visual_Patcher {
                     }
                 }
                 (modNames, modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
+                ModIndex = -1;
                 foreach (ISkyrimModGetter mod in modsToPatch) {
                     int processed = 0;
                     int ignored = 0;
-                    int total = mod.Npcs.Count;
-                    var modFormIDs = mod.Npcs.Select(x => x.FormKey).ToList();
-                    var winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<INpcGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
+                    int total = mod.Outfits.Count;
+                    var modFormIDs = mod.Outfits.Select(x => x.FormKey).ToList();
+                    var winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IOutfitGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                     ModIndex++;
-                    System.Console.WriteLine("\nImporting visuals from: " + modNames[ModIndex]);
-                    if (mod.Npcs.Count > 0) {
-                        foreach (INpcGetter npc in mod.Npcs) {
+                    System.Console.WriteLine("\nImporting furs from: " + modNames[ModIndex]);
+                    if (mod.Outfits.Count > 0) {
+                        foreach (IOutfitGetter outfit in mod.Outfits) {
                             if (processed % 10 == 0) {
-                                System.Console.WriteLine(processed + "/" + total + " Npcs");
+                                System.Console.WriteLine(processed + "/" + total + " outfits");
                             }
-                            var winningOverride = winningOverrides.Where(x => x.FormKey == npc.FormKey).First();
-                            var patchNpc = state.PatchMod.Npcs.GetOrAddAsOverride(winningOverride);
-                            if (npc.Items is not null) {
-                                List<IContainerEntryGetter> fursToRemove = new();
-                                foreach (IContainerEntryGetter item in npc.Items) {
-
-                                    String? itemName = item.Item.ToString();
-                                    if (itemName is not null && furTypes.Contains(itemName)){
+                            IOutfitGetter winningOverride = winningOverrides.Where(x => x.FormKey == outfit.FormKey).First();
+                            Outfit patchOutfit = state.PatchMod.Outfits.GetOrAddAsOverride(winningOverride);
+                            if (outfit.Items is not null) {
+                                List<IOutfitTargetGetter> fursToRemove = new();
+                                foreach (IFormLinkGetter<IOutfitTargetGetter> itemForm in outfit.Items) {
+                                    IOutfitTargetGetter? item = itemForm.TryResolve(state.LinkCache);
+                                    if (item is not null && item.EditorID is not null && furTypes.Contains(item.EditorID)){
                                         //Apparently the item list can be null, so if we need to add fur we need to check for this
-                                        if (patchNpc.Items is null) {
-                                            patchNpc.Items = new ExtendedList<ContainerEntry>();
+                                        if (patchOutfit.Items is null) {
+                                            patchOutfit.Items = new ExtendedList<IFormLinkGetter<IOutfitTargetGetter>>();
                                         }
                                         //mark any existing furs for deletion. We can't delete them here because we can't iterate on an ExtendedList and modify it at the same time
-                                        foreach (IContainerEntryGetter potentialFur in patchNpc.Items) {
-                                            String? potentialFurName = potentialFur.Item.ToString();
-                                            if (potentialFurName is not null && furTypes.Contains(potentialFurName)) {
-                                                fursToRemove.Add(potentialFur);
+                                        foreach (IFormLinkGetter<IOutfitTargetGetter> potentialFurForm in patchOutfit.Items) {
+                                            IOutfitTargetGetter? potentialFurItem = potentialFurForm.TryResolve(state.LinkCache);
+                                            if (potentialFurItem is not null && potentialFurItem.EditorID is not null && furTypes.Contains(potentialFurItem.EditorID)) {
+                                                fursToRemove.Add(potentialFurItem);
                                             }
                                         }
-                                        patchNpc.Items.Add(item.DeepCopy());
+                                        patchOutfit.Items.Add(itemForm);
                                     }
                                 }
                             }
+                            //remove unchanged outfits
+                            if (patchOutfit.Equals(winningOverride)) {
+                                state.PatchMod.Outfits.Remove(outfit);
+                                ignored++;
+                            }
+
+                            processed++;
                         }
                     }
                     else {
                         System.Console.WriteLine("No NPCs found");
                     }
-                    System.Console.WriteLine("Ignoring " + ignored + " unchanged NPCs");
+                    System.Console.WriteLine("Ignoring " + ignored + " unchanged Outfits");
                 }
             }
         }
