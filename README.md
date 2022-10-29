@@ -6,7 +6,7 @@ What this doesen't do: This does not generate *new* SkyFurry visuals for NPCs, m
 
 Do you need this?: If you have mods which are conflicting with large numbers of SkyFurry's NPC records, and hand-made patches that incorporate SkyFurry visuals with those mods either don't exist or are incomplete, this can save you many hours of patching. In my case, this was the combination of SkyFurry, AI Overhaul, Requiem, and several other mods. 
 
-How to use: This patcher allows for more load-order flexibility. As long as you put the output of this patch after everything which modifies NPC records, SkyFurry.esp and SkyFurry patches containing NPC records can be placed *before* other mods that edit NPCs. The winning overrides will have their visuals erased and replaced with SkyFurry visuals.
+How to use: This patcher allows for more load-order flexibility. As long as you put the output of this patch after everything which modifies NPC records (Except for specific cases that need to be loaded even later such as "Requiem for the Indifferent.esp", which will incorporate this patch's changes anyway), SkyFurry.esp and SkyFurry patches containing NPC records can be placed *before* other mods that edit NPCs. The winning overrides will have their visuals erased and replaced with SkyFurry visuals.
 
 Notes: This patcher always prioritizes visuals from the latest override that inherits from SkyFurry, so if you have patches which intentionally overwrite SkyFurry visual data, they will be included in the generated patch, as long as no more than one edits the same NPC, as this script does not attempt to merge any visual changes.
 
