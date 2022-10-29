@@ -115,6 +115,13 @@ namespace SkyFurry_Visual_Patcher {
             System.Console.WriteLine("\nChecking for flowing fur...");
             if (FlowingFur != null) {
                 System.Console.WriteLine("Found!");
+                //get a list of furs added by SkyFurry_FlowingFur.esp so that we can detect them in NPCs
+                List<String> furTypes = new();
+                foreach (IArmorGetter furType in FlowingFur.Armors) {
+                    if (furType.EditorID is not null) {
+                        furTypes.Add(furType.EditorID.ToString());
+                    }
+                }
                 (modNames, modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
                 foreach (ISkyrimModGetter mod in modsToPatch) {
                     int processed = 0;
@@ -132,19 +139,21 @@ namespace SkyFurry_Visual_Patcher {
                             var winningOverride = winningOverrides.Where(x => x.FormKey == npc.FormKey).First();
                             var patchNpc = state.PatchMod.Npcs.GetOrAddAsOverride(winningOverride);
                             if (npc.Items is not null) {
+                                List<IContainerEntryGetter> fursToRemove = new();
                                 foreach (IContainerEntryGetter item in npc.Items) {
-                                    //get a list of furs added by SkyFurry_FlowingFur.esp so that we can detect them in NPCs
-                                    List<String> furTypes = new();
-                                    foreach (IArmorGetter furType in FlowingFur.Armors) {
-                                        if (furType.EditorID is not null) {
-                                            furTypes.Add(furType.EditorID.ToString());
-                                        }
-                                    }
+
                                     String? itemName = item.Item.ToString();
                                     if (itemName is not null && furTypes.Contains(itemName)){
                                         //Apparently the item list can be null, so if we need to add fur we need to check for this
                                         if (patchNpc.Items is null) {
                                             patchNpc.Items = new ExtendedList<ContainerEntry>();
+                                        }
+                                        //mark any existing furs for deletion. We can't delete them here because we can't iterate on an ExtendedList and modify it at the same time
+                                        foreach (IContainerEntryGetter potentialFur in patchNpc.Items) {
+                                            String? potentialFurName = potentialFur.Item.ToString();
+                                            if (potentialFurName is not null && furTypes.Contains(potentialFurName)) {
+                                                fursToRemove.Add(potentialFur);
+                                            }
                                         }
                                         patchNpc.Items.Add(item.DeepCopy());
                                     }
