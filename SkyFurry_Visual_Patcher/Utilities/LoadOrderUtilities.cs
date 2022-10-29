@@ -20,8 +20,8 @@ namespace SkyFurry_Visual_Patcher.Utilities {
                 var mod = LoadOrder[modName].Mod;
                 if (mod is not null)
                     foreach (IMasterReferenceGetter currentMaster in mod.MasterReferences) {
-                        //list mods that inherit from FlowingFur and are not synthesis.esp
-                        if (currentMaster.Master.ToString().Equals("SkyFurry.esp") && !(modName.ToString().ToLower().Equals("synthesis.esp") || modName.ToString().ToLower().Equals("requiem for the indifferent.esp"))) {
+                        //list mods that inherit from master and are not synthesis.esp or requiem for the indifferent.esp
+                        if (currentMaster.Master.ToString().Equals(masterName) && !(modName.ToString().ToLower().Equals("synthesis.esp") || modName.ToString().ToLower().Equals("requiem for the indifferent.esp"))) {
                             modsToPatch.Add(mod);
                             modNames.Add(modName.ToString());
                         }
