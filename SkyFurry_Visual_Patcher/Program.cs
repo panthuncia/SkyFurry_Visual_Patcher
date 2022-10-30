@@ -133,11 +133,9 @@ namespace SkyFurry_Visual_Patcher {
             if (FlowingFur != null) {
                 System.Console.WriteLine("Found!");
                 //get a list of furs added by SkyFurry_FlowingFur.esp so that we can detect them in NPCs
-                List<String> furTypes = new();
+                List<FormKey> furTypes = new();
                 foreach (IArmorGetter furType in FlowingFur.Armors) {
-                    if (furType.EditorID is not null) {
-                        furTypes.Add(furType.EditorID.ToString());
-                    }
+                        furTypes.Add(furType.FormKey);
                 }
                 (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
                 int ModIndex = -1;
@@ -161,7 +159,7 @@ namespace SkyFurry_Visual_Patcher {
                                 //Entries in outfit item lists are IFormLinkGetter, which need to be resolved with TryResolve(state.LinkCache) instead of being accessed directly.
                                 foreach (IFormLinkGetter<IOutfitTargetGetter> itemForm in outfit.Items) {
                                     IOutfitTargetGetter? item = itemForm.TryResolve(state.LinkCache);
-                                    if (item is not null && item.EditorID is not null && furTypes.Contains(item.EditorID)) {
+                                    if (item is not null && furTypes.Contains(item.FormKey)) {
                                         //Apparently the item list can be null, so if we need to add fur we need to check for this
                                         if (patchOutfit.Items is null) {
                                             patchOutfit.Items = new ExtendedList<IFormLinkGetter<IOutfitTargetGetter>>();
@@ -169,7 +167,7 @@ namespace SkyFurry_Visual_Patcher {
                                         //mark any existing furs for deletion. We can't delete them here because we can't iterate on an ExtendedList and modify it at the same time
                                         foreach (IFormLinkGetter<IOutfitTargetGetter> potentialFurForm in patchOutfit.Items) {
                                             IOutfitTargetGetter? potentialFurItem = potentialFurForm.TryResolve(state.LinkCache);
-                                            if (potentialFurItem is not null && potentialFurItem.EditorID is not null && furTypes.Contains(potentialFurItem.EditorID)) {
+                                            if (potentialFurItem is not null && furTypes.Contains(potentialFurItem.FormKey)) {
                                                 fursToRemove.Add(potentialFurItem);
                                             }
                                         }
@@ -207,12 +205,10 @@ namespace SkyFurry_Visual_Patcher {
                 List<FormKey> modFormIDs = sharpClaws.Races.Select(x => x.FormKey).ToList();
                 List<IRaceGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IRaceGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                 //list sharpclaws spells
-                List<String> sharpClaws_Spells = new();
+                List<FormKey> sharpClaws_Spells = new();
                 foreach (ISpellGetter spell in sharpClaws.Spells) {
-                    if (spell.EditorID is not null) {
-                        sharpClaws_Spells.Add(spell.EditorID);
-                        System.Console.WriteLine("SharpClaws spell: "+spell.EditorID);
-                    }
+                        sharpClaws_Spells.Add(spell.FormKey);
+                        System.Console.WriteLine("SharpClaws spell: "+spell.FormKey);
                 }
                 //patch races
                 int processed = 0;
@@ -229,13 +225,13 @@ namespace SkyFurry_Visual_Patcher {
 
                     //patch actor effects
                     //list winning override actor effects
-                    List<String> winningOverrideActorEffects = new();
+                    List<FormKey> winningOverrideActorEffects = new();
                     if (winningOverride.ActorEffect is not null) {
                         //another IFormLinkGetter
                         foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in winningOverride.ActorEffect) {
                             ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
-                            if (effect is not null && effect.EditorID is not null) {
-                                winningOverrideActorEffects.Add(effect.EditorID);
+                            if (effect is not null) {
+                                winningOverrideActorEffects.Add(effect.FormKey);
                             }
                         }
                     }
@@ -243,11 +239,12 @@ namespace SkyFurry_Visual_Patcher {
                     if (race.ActorEffect is not null) {
                         foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in race.ActorEffect) {
                             ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
-                            if (effect is not null && effect.EditorID is not null && sharpClaws_Spells.Contains(effect.EditorID) && !winningOverrideActorEffects.Contains(effect.EditorID)) {
+                            if (effect is not null && (sharpClaws_Spells.Contains(effect.FormKey)) && !winningOverrideActorEffects.Contains(effect.FormKey)) {
                                 if (patchRace.ActorEffect is null) {
                                     patchRace.ActorEffect = new ExtendedList<IFormLinkGetter<ISpellRecordGetter>>();
                                 }
                                 patchRace.ActorEffect.Add(effectForm);
+                                System.Console.WriteLine(effect.FormKey);
                             }
                         }
                     }
