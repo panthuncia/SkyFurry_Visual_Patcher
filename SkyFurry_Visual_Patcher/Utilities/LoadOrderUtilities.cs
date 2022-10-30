@@ -24,7 +24,7 @@ namespace SkyFurry_Visual_Patcher.Utilities {
                 if (mod is not null)
                     foreach (IMasterReferenceGetter currentMaster in mod.MasterReferences) {
                         //list mods that inherit from master
-                        if (currentMaster.Master.ToString().Equals(masterName)) {
+                        if (currentMaster.Master.ToString().Equals(masterName) && !(modName.ToString().ToLower().Equals("synthesis.esp") || modName.ToString().ToLower().Equals("requiem for the indifferent.esp"))) {
                             modsToPatch.Add(mod);
                             modNames.Add(modName.ToString());
                         }
