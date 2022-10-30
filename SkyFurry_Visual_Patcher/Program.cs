@@ -197,6 +197,11 @@ namespace SkyFurry_Visual_Patcher {
                 }
             }
         }
+        /**
+         * void patchSharpClaws(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all edits made by SkyFurry_SharpClaws.esp and anything which depends on it.
+         * Lots of optimization is possible here, but much of what makes this function complex is to ensure compatability with mods that add content that should also be
+         * patched, or add new races which use that content.
+         */
         private static void patchSharpClaws(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             ISkyrimModGetter? sharpClaws = state.LoadOrder.getModByFileName("SkyFurry_SharpClaws.esp");
             if (sharpClaws == null) {
@@ -214,86 +219,129 @@ namespace SkyFurry_Visual_Patcher {
                 List<FormKey> modFormIDs = sharpClaws.Races.Select(x => x.FormKey).ToList();
                 List<IRaceGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IRaceGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                 //list sharpclaws spells
-                List<FormKey> sharpClaws_Spells = new();
-                foreach (ISpellGetter spell in sharpClaws.Spells) {
-                        sharpClaws_Spells.Add(spell.FormKey);
-                }
                 //patch races
-                int processed = 0;
-                int total = sharpClaws.Races.Count;
-                foreach (IRaceGetter race in sharpClaws.Races) {
-                    if (processed % 10 == 0) {
-                        System.Console.WriteLine(processed+"/"+total+" Races");
+                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMaster("SkyFurry_SharpClaws.esp", sharpClaws);
+                foreach (ISkyrimModGetter mod in modsToPatch) {
+                    List<FormKey> sharpClaws_Spells = new();
+                    //get all of the spells added by this mod
+                    foreach (ISpellGetter spell in mod.Spells) {
+                        sharpClaws_Spells.Add(spell.FormKey);
                     }
-                    IRaceGetter winningOverride = winningOverrides.Where(x => x.FormKey == race.FormKey).First();
-                    Race patchRace = state.PatchMod.Races.GetOrAddAsOverride(winningOverride);
-
-                    //patch impact data
-                    patchRace.ImpactDataSet.SetTo(race.ImpactDataSet);
-
-                    //patch actor effects
-                    //list winning override actor effects
-                    List<FormKey> winningOverrideActorEffects = new();
-                    if (winningOverride.ActorEffect is not null) {
-                        //another IFormLinkGetter
-                        foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in winningOverride.ActorEffect) {
-                            ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
-                            if (effect is not null) {
-                                winningOverrideActorEffects.Add(effect.FormKey);
-                            }
-                        }
-                    }
-                    //check every race effect record in the current mod, and if it is in SkyFurry_SharpClaws.esp but is not in the winning override, add it to the patch
-                    if (race.ActorEffect is not null) {
-                        foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in race.ActorEffect) {
-                            ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
-                            if (effect is not null && (sharpClaws_Spells.Contains(effect.FormKey)) && !winningOverrideActorEffects.Contains(effect.FormKey)) {
-                                if (patchRace.ActorEffect is null) {
-                                    patchRace.ActorEffect = new ExtendedList<IFormLinkGetter<ISpellRecordGetter>>();
+                    //get all of the spells added by this mods masters, as long as that master also has SharpClaws as a master.
+                    //This could add unrelated spells, but shouldn't cause many issues, but there could be some problematic edge cases.
+                    //it is necessary in order to support new SharpClaws spells added by extensions to SharpClaws that inherit from it.  
+                    foreach (var master in mod.MasterReferences) {
+                        ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
+                        if (masterMod != null) {
+                            //to avoid pulling every spell from the base game and every mod we might have a SharpClaws patch for, we check that the master mod itself inherits from SharpClaws.
+                            bool inheritsFromSharpClaws = false;
+                            foreach (IMasterReferenceGetter masterForSpellCheck in masterMod.MasterReferences) {
+                                if (masterForSpellCheck.Master.ToString().Equals("SkyFurry_SharpClaws.esp")){
+                                    inheritsFromSharpClaws = true;
+                                    break;
                                 }
-                                patchRace.ActorEffect.Add(effectForm);
+                            }
+                            //if the master inherits from SharpClaws
+                            if (inheritsFromSharpClaws) {
+                                foreach (ISpellGetter spell in masterMod.Spells) {
+                                    sharpClaws_Spells.Add(spell.FormKey);
+                                }
                             }
                         }
                     }
-                    //forward unarmed damage modifiers.
-                    //if set, scale race unarmed damage with the same scaling factor applied to the winning override
-                    if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
-                        //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
-                        float baseRaceDamage = 4;
-                        bool found = false;
-                        //look for race in SkyFurry
-                        foreach (IRaceGetter baseRace in skyFurry.Races) {
-                            if (baseRace.FormKey.Equals(race.FormKey)){
-                                baseRaceDamage = baseRace.UnarmedDamage;
-                                found = true;
+                    int processed = 0;
+                    int total = mod.Races.Count;
+                    foreach (IRaceGetter race in mod.Races) {
+                        if (processed % 10 == 0) {
+                            System.Console.WriteLine(processed + "/" + total + " Races");
+                        }
+                        IRaceGetter winningOverride = winningOverrides.Where(x => x.FormKey == race.FormKey).First();
+                        Race patchRace = state.PatchMod.Races.GetOrAddAsOverride(winningOverride);
+
+                        //patch impact data
+                        patchRace.ImpactDataSet.SetTo(race.ImpactDataSet);
+
+                        //patch actor effects
+                        //list winning override actor effects
+                        List<FormKey> winningOverrideActorEffects = new();
+                        if (winningOverride.ActorEffect is not null) {
+                            //another IFormLinkGetter
+                            foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in winningOverride.ActorEffect) {
+                                ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
+                                if (effect is not null) {
+                                    winningOverrideActorEffects.Add(effect.FormKey);
+                                }
                             }
                         }
-                        //if it wasn't found there, look in the masters
-                        if (!found) {
-                            //List<String> espsToCheck = new();
-                            foreach (var master in sharpClaws.MasterReferences) {
-                                ISkyrimModGetter? esp = state.LoadOrder.getModByFileName(master.Master.ToString());
-                                if (esp != null) {
-                                    foreach (IRaceGetter baseRace in esp.Races) {
-                                        if (baseRace.FormKey.Equals(race.FormKey)) {
-                                            baseRaceDamage = baseRace.UnarmedDamage;
-                                            found = true;
-                                        }
+                        //check every race effect record in the current mod, and if it is in SkyFurry_SharpClaws.esp or anything that inherits from it but is not in the winning override, add it to the patch
+                        if (race.ActorEffect is not null) {
+                            foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in race.ActorEffect) {
+                                ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
+                                if (effect is not null && (sharpClaws_Spells.Contains(effect.FormKey)) && !winningOverrideActorEffects.Contains(effect.FormKey)) {
+                                    if (patchRace.ActorEffect is null) {
+                                        patchRace.ActorEffect = new ExtendedList<IFormLinkGetter<ISpellRecordGetter>>();
+                                    }
+                                    patchRace.ActorEffect.Add(effectForm);
+                                }
+                            }
+                        }
+                        //forward unarmed damage modifiers.
+                        //if set, scale race unarmed damage with the same scaling factor applied to the winning override
+                        if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
+                            //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
+                            float baseRaceDamage = 4;
+                            bool found = false;
+                            //look for race in SkyFurry
+                            foreach (IRaceGetter baseRace in skyFurry.Races) {
+                                if (baseRace.FormKey.Equals(race.FormKey)) {
+                                    baseRaceDamage = baseRace.UnarmedDamage;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            //if it wasn't found there, look in this mod
+                            if (!found) {
+                                foreach (IRaceGetter baseRace in mod.Races) {
+                                    if (baseRace.FormKey.Equals(race.FormKey)) {
+                                        baseRaceDamage = baseRace.UnarmedDamage;
+                                        found = true;
+                                        break;
                                     }
                                 }
                             }
+                            //if it's not found there, look in this mod's masters
                             if (!found) {
-                                System.Console.WriteLine("Mystery race, ig");
+                                foreach (var master in mod.MasterReferences) {
+                                    ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
+                                    if (masterMod != null) {
+                                        foreach (IRaceGetter baseRace in masterMod.Races) {
+                                            if (baseRace.FormKey.Equals(race.FormKey)) {
+                                                baseRaceDamage = baseRace.UnarmedDamage;
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!found) {
+                                    System.Console.WriteLine("Mystery race, ig");
+                                }
                             }
+                            foreach (IRaceGetter baseRace in skyFurry.Races) {
+                                if (baseRace.FormKey.Equals(race.FormKey)) {
+                                    baseRaceDamage = baseRace.UnarmedDamage;
+                                    found = true;
+                                }
+                            }
+                            float scaleFactor = winningOverride.UnarmedDamage / baseRaceDamage;
+                            //apply scaling factor to SharpClaws damage 
+                            patchRace.UnarmedDamage = race.UnarmedDamage * scaleFactor;
                         }
-                        float scaleFactor = winningOverride.UnarmedDamage / baseRaceDamage;
-                        //apply scaling factor to SharpClaws damage 
-                        patchRace.UnarmedDamage = race.UnarmedDamage * scaleFactor;
+                        else {
+                            patchRace.UnarmedDamage = race.UnarmedDamage;
+                        }
+                        processed++;
                     }
-                    else {
-                        patchRace.UnarmedDamage = race.UnarmedDamage;
-                    }
-                    processed++;
                 }
             }
         }
