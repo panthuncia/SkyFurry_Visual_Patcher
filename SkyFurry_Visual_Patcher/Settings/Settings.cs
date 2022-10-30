@@ -10,5 +10,6 @@ namespace SkyFurry_Visual_Patcher.Settings {
         public bool mergeVisuals { get; set; } = true;
         public bool mergeFlowingFur { get; set; } = true;
         public bool mergeSharpClaws { get; set; } = true;
+        public bool scaleUnarmedDamageWithWinningOverride { get; set; } = true;
     }
 }

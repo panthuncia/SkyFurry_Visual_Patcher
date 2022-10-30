@@ -199,6 +199,15 @@ namespace SkyFurry_Visual_Patcher {
         }
         private static void patchSharpClaws(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             ISkyrimModGetter? sharpClaws = state.LoadOrder.getModByFileName("SkyFurry_SharpClaws.esp");
+            if (sharpClaws == null) {
+                System.Console.WriteLine("SkyFurry_SharpClaws.esp not found");
+                return;
+            }
+            ISkyrimModGetter? skyFurry = state.LoadOrder.getModByFileName("SkyFurry.esp");
+            if (skyFurry == null) {
+                System.Console.WriteLine("SkyFurry.esp not found");
+                return;
+            }
             System.Console.WriteLine("\nChecking for sharp claws...");
             if (sharpClaws != null) {
                 System.Console.WriteLine("Found!");
@@ -208,7 +217,6 @@ namespace SkyFurry_Visual_Patcher {
                 List<FormKey> sharpClaws_Spells = new();
                 foreach (ISpellGetter spell in sharpClaws.Spells) {
                         sharpClaws_Spells.Add(spell.FormKey);
-                        System.Console.WriteLine("SharpClaws spell: "+spell.FormKey);
                 }
                 //patch races
                 int processed = 0;
@@ -244,9 +252,25 @@ namespace SkyFurry_Visual_Patcher {
                                     patchRace.ActorEffect = new ExtendedList<IFormLinkGetter<ISpellRecordGetter>>();
                                 }
                                 patchRace.ActorEffect.Add(effectForm);
-                                System.Console.WriteLine(effect.FormKey);
                             }
                         }
+                    }
+                    //forward unarmed damage modifiers.
+                    //if set, scale race unarmed damage with the same scaling factor applied to the winning override
+                    if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
+                        //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
+                        float baseRaceDamage = 1;
+                        foreach (IRaceGetter baseRace in skyFurry.Races) {
+                            if (baseRace.FormKey.Equals(race.FormKey)){
+                                baseRaceDamage = baseRace.UnarmedDamage;
+                            }
+                        }
+                        float scaleFactor = winningOverride.UnarmedDamage / baseRaceDamage;
+                        //apply scaling factor to SharpClaws damage 
+                        patchRace.UnarmedDamage = race.UnarmedDamage * scaleFactor;
+                    }
+                    else {
+                        patchRace.UnarmedDamage = race.UnarmedDamage;
                     }
                     processed++;
                 }
