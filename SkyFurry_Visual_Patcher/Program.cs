@@ -33,11 +33,14 @@ namespace SkyFurry_Visual_Patcher {
             if (_settings.Value.mergeFlowingFur) {
                 patchFlowingFur(state);
             }
+            if (_settings.Value.mergeSharpClaws) {
+                patchSharpClaws(state);
+            }
         }
 
         private static void patchVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //check for SkyFurry
-            ISkyrimModGetter? SkyFurry = state.LoadOrder[state.LoadOrder.Keys.Where(x => ((string)x.FileName).ToLower() == "SkyFurry.esp".ToLower()).ToList().First()].Mod;
+            ISkyrimModGetter? SkyFurry = state.LoadOrder.getModByFileName("SkyFurry.esp");
 
             if (SkyFurry == null) {
                 System.Console.WriteLine("SkyFurry.esp not found");
@@ -45,7 +48,7 @@ namespace SkyFurry_Visual_Patcher {
             }
             System.Console.WriteLine("Patching base SkyFurry visuals\n");
             //get list of mods which inherit from SkyFurry, as these may contain NPCs we need to patch
-            (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry.esp", SkyFurry);
+            (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMaster("SkyFurry.esp", SkyFurry);
             System.Console.WriteLine("\nForwarding visuals from:");
             foreach (String modName in modNames) {
                 System.Console.WriteLine(modName);
@@ -55,8 +58,8 @@ namespace SkyFurry_Visual_Patcher {
                 int processed = 0;
                 int ignored = 0;
                 int total = mod.Npcs.Count;
-                var modFormIDs = mod.Npcs.Select(x => x.FormKey).ToList();
-                var winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<INpcGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
+                List<FormKey> modFormIDs = mod.Npcs.Select(x => x.FormKey).ToList();
+                List<INpcGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<INpcGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                 ModIndex++;
                 System.Console.WriteLine("\nImporting visuals from: " + modNames[ModIndex]);
                 if (mod.Npcs.Count > 0) {
@@ -64,8 +67,8 @@ namespace SkyFurry_Visual_Patcher {
                         if (processed % 10 == 0) {
                             System.Console.WriteLine(processed + "/" + total + " Npcs");
                         }
-                        var winningOverride = winningOverrides.Where(x => x.FormKey == npc.FormKey).First();
-                        var patchNpc = state.PatchMod.Npcs.GetOrAddAsOverride(winningOverride);
+                        INpcGetter winningOverride = winningOverrides.Where(x => x.FormKey == npc.FormKey).First();
+                        Npc patchNpc = state.PatchMod.Npcs.GetOrAddAsOverride(winningOverride);
 
                         //copy texture lighting
                         patchNpc.TextureLighting = npc.TextureLighting;
@@ -121,72 +124,6 @@ namespace SkyFurry_Visual_Patcher {
                     System.Console.WriteLine("Ignoring " + ignored + " unchanged NPCs");
                 }
             }
-            //Now check for flowing fur addon and forward changes from it and anything that inherits from it
-            ISkyrimModGetter? FlowingFur = state.LoadOrder[state.LoadOrder.Keys.Where(x => ((string)x.FileName).ToLower() == "SkyFurry_FlowingFur.esp".ToLower()).ToList().First()].Mod;
-            System.Console.WriteLine("\nChecking for flowing fur...");
-            if (FlowingFur != null) {
-                System.Console.WriteLine("Found!");
-                //get a list of furs added by SkyFurry_FlowingFur.esp so that we can detect them in NPCs
-                List<String> furTypes = new();
-                foreach (IArmorGetter furType in FlowingFur.Armors) {
-                    if (furType.EditorID is not null) {
-                        furTypes.Add(furType.EditorID.ToString());
-                    }
-                }
-                (modNames, modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
-                ModIndex = -1;
-                foreach (ISkyrimModGetter mod in modsToPatch) {
-                    int processed = 0;
-                    int ignored = 0;
-                    int total = mod.Outfits.Count;
-                    var modFormIDs = mod.Outfits.Select(x => x.FormKey).ToList();
-                    var winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IOutfitGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
-                    ModIndex++;
-                    System.Console.WriteLine("\nImporting furs from: " + modNames[ModIndex]);
-                    if (mod.Outfits.Count > 0) {
-                        foreach (IOutfitGetter outfit in mod.Outfits) {
-                            if (processed % 10 == 0) {
-                                System.Console.WriteLine(processed + "/" + total + " outfits");
-                            }
-                            IOutfitGetter winningOverride = winningOverrides.Where(x => x.FormKey == outfit.FormKey).First();
-                            Outfit patchOutfit = state.PatchMod.Outfits.GetOrAddAsOverride(winningOverride);
-                            if (outfit.Items is not null) {
-                                List<IOutfitTargetGetter> fursToRemove = new();
-                                foreach (IFormLinkGetter<IOutfitTargetGetter> itemForm in outfit.Items) {
-                                    IOutfitTargetGetter? item = itemForm.TryResolve(state.LinkCache);
-                                    if (item is not null && item.EditorID is not null && furTypes.Contains(item.EditorID)){
-                                        //Apparently the item list can be null, so if we need to add fur we need to check for this
-                                        if (patchOutfit.Items is null) {
-                                            patchOutfit.Items = new ExtendedList<IFormLinkGetter<IOutfitTargetGetter>>();
-                                        }
-                                        //mark any existing furs for deletion. We can't delete them here because we can't iterate on an ExtendedList and modify it at the same time
-                                        foreach (IFormLinkGetter<IOutfitTargetGetter> potentialFurForm in patchOutfit.Items) {
-                                            IOutfitTargetGetter? potentialFurItem = potentialFurForm.TryResolve(state.LinkCache);
-                                            if (potentialFurItem is not null && potentialFurItem.EditorID is not null && furTypes.Contains(potentialFurItem.EditorID)) {
-                                                fursToRemove.Add(potentialFurItem);
-                                            }
-                                        }
-                                        patchOutfit.Items.Add(itemForm);
-                                    }
-                                }
-                            }
-                            //remove unchanged outfits
-                            if (_settings.Value.ignoreIdenticalToWinningOverride && patchOutfit.Equals(winningOverride)) {
-                                state.PatchMod.Outfits.Remove(outfit);
-                                ignored++;
-                            }
-
-                            processed++;
-                        }
-                    }
-                    else {
-                        System.Console.WriteLine("No NPCs found");
-                    }
-                    if (ignored > 0) {
-                        System.Console.WriteLine("Ignoring " + ignored + " unchanged Outfits");
-                    }
-                }
-            }
         }
 
         private static void patchFlowingFur(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
@@ -196,20 +133,18 @@ namespace SkyFurry_Visual_Patcher {
             if (FlowingFur != null) {
                 System.Console.WriteLine("Found!");
                 //get a list of furs added by SkyFurry_FlowingFur.esp so that we can detect them in NPCs
-                List<String> furTypes = new();
+                List<FormKey> furTypes = new();
                 foreach (IArmorGetter furType in FlowingFur.Armors) {
-                    if (furType.EditorID is not null) {
-                        furTypes.Add(furType.EditorID.ToString());
-                    }
+                        furTypes.Add(furType.FormKey);
                 }
-                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getPatchableModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
+                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMaster("SkyFurry_FlowingFur.esp", FlowingFur);
                 int ModIndex = -1;
                 foreach (ISkyrimModGetter mod in modsToPatch) {
                     int processed = 0;
                     int ignored = 0;
                     int total = mod.Outfits.Count;
-                    var modFormIDs = mod.Outfits.Select(x => x.FormKey).ToList();
-                    var winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IOutfitGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
+                    List<FormKey> modFormIDs = mod.Outfits.Select(x => x.FormKey).ToList();
+                    List<IOutfitGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IOutfitGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                     ModIndex++;
                     System.Console.WriteLine("\nImporting furs from: " + modNames[ModIndex]);
                     if (mod.Outfits.Count > 0) {
@@ -221,9 +156,10 @@ namespace SkyFurry_Visual_Patcher {
                             Outfit patchOutfit = state.PatchMod.Outfits.GetOrAddAsOverride(winningOverride);
                             if (outfit.Items is not null) {
                                 List<IOutfitTargetGetter> fursToRemove = new();
+                                //Entries in outfit item lists are IFormLinkGetter, which need to be resolved with TryResolve(state.LinkCache) instead of being accessed directly.
                                 foreach (IFormLinkGetter<IOutfitTargetGetter> itemForm in outfit.Items) {
                                     IOutfitTargetGetter? item = itemForm.TryResolve(state.LinkCache);
-                                    if (item is not null && item.EditorID is not null && furTypes.Contains(item.EditorID)) {
+                                    if (item is not null && furTypes.Contains(item.FormKey)) {
                                         //Apparently the item list can be null, so if we need to add fur we need to check for this
                                         if (patchOutfit.Items is null) {
                                             patchOutfit.Items = new ExtendedList<IFormLinkGetter<IOutfitTargetGetter>>();
@@ -231,7 +167,7 @@ namespace SkyFurry_Visual_Patcher {
                                         //mark any existing furs for deletion. We can't delete them here because we can't iterate on an ExtendedList and modify it at the same time
                                         foreach (IFormLinkGetter<IOutfitTargetGetter> potentialFurForm in patchOutfit.Items) {
                                             IOutfitTargetGetter? potentialFurItem = potentialFurForm.TryResolve(state.LinkCache);
-                                            if (potentialFurItem is not null && potentialFurItem.EditorID is not null && furTypes.Contains(potentialFurItem.EditorID)) {
+                                            if (potentialFurItem is not null && furTypes.Contains(potentialFurItem.FormKey)) {
                                                 fursToRemove.Add(potentialFurItem);
                                             }
                                         }
@@ -261,5 +197,154 @@ namespace SkyFurry_Visual_Patcher {
                 }
             }
         }
+        /**
+         * void patchSharpClaws(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all edits made by SkyFurry_SharpClaws.esp and anything which depends on it.
+         * Lots of optimization is possible here, but much of what makes this function complex is to ensure compatability with mods that add content that should also be
+         * patched, or add new races which use that content.
+         */
+        private static void patchSharpClaws(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+            ISkyrimModGetter? sharpClaws = state.LoadOrder.getModByFileName("SkyFurry_SharpClaws.esp");
+            if (sharpClaws == null) {
+                System.Console.WriteLine("SkyFurry_SharpClaws.esp not found");
+                return;
+            }
+            ISkyrimModGetter? skyFurry = state.LoadOrder.getModByFileName("SkyFurry.esp");
+            if (skyFurry == null) {
+                System.Console.WriteLine("SkyFurry.esp not found");
+                return;
+            }
+            System.Console.WriteLine("\nChecking for sharp claws...");
+            if (sharpClaws != null) {
+                System.Console.WriteLine("Found!");
+                List<FormKey> modFormIDs = sharpClaws.Races.Select(x => x.FormKey).ToList();
+                List<IRaceGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IRaceGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
+                //list sharpclaws spells
+                //patch races
+                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMaster("SkyFurry_SharpClaws.esp", sharpClaws);
+                foreach (ISkyrimModGetter mod in modsToPatch) {
+                    List<FormKey> sharpClaws_Spells = new();
+                    //get all of the spells added by this mod
+                    foreach (ISpellGetter spell in mod.Spells) {
+                        sharpClaws_Spells.Add(spell.FormKey);
+                    }
+                    //get all of the spells added by this mods masters, as long as that master also has SharpClaws as a master.
+                    //This could add unrelated spells, but shouldn't cause many issues, but there could be some problematic edge cases.
+                    //it is necessary in order to support new SharpClaws spells added by extensions to SharpClaws that inherit from it.  
+                    foreach (var master in mod.MasterReferences) {
+                        ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
+                        if (masterMod != null) {
+                            //to avoid pulling every spell from the base game and every mod we might have a SharpClaws patch for, we check that the master mod itself inherits from SharpClaws.
+                            bool inheritsFromSharpClaws = false;
+                            foreach (IMasterReferenceGetter masterForSpellCheck in masterMod.MasterReferences) {
+                                if (masterForSpellCheck.Master.ToString().Equals("SkyFurry_SharpClaws.esp")){
+                                    inheritsFromSharpClaws = true;
+                                    break;
+                                }
+                            }
+                            //if the master inherits from SharpClaws
+                            if (inheritsFromSharpClaws) {
+                                foreach (ISpellGetter spell in masterMod.Spells) {
+                                    sharpClaws_Spells.Add(spell.FormKey);
+                                }
+                            }
+                        }
+                    }
+                    int processed = 0;
+                    int total = mod.Races.Count;
+                    foreach (IRaceGetter race in mod.Races) {
+                        if (processed % 10 == 0) {
+                            System.Console.WriteLine(processed + "/" + total + " Races");
+                        }
+                        IRaceGetter winningOverride = winningOverrides.Where(x => x.FormKey == race.FormKey).First();
+                        Race patchRace = state.PatchMod.Races.GetOrAddAsOverride(winningOverride);
+
+                        //patch impact data
+                        patchRace.ImpactDataSet.SetTo(race.ImpactDataSet);
+
+                        //patch actor effects
+                        //list winning override actor effects
+                        List<FormKey> winningOverrideActorEffects = new();
+                        if (winningOverride.ActorEffect is not null) {
+                            //another IFormLinkGetter
+                            foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in winningOverride.ActorEffect) {
+                                ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
+                                if (effect is not null) {
+                                    winningOverrideActorEffects.Add(effect.FormKey);
+                                }
+                            }
+                        }
+                        //check every race effect record in the current mod, and if it is in SkyFurry_SharpClaws.esp or anything that inherits from it but is not in the winning override, add it to the patch
+                        if (race.ActorEffect is not null) {
+                            foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in race.ActorEffect) {
+                                ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
+                                if (effect is not null && (sharpClaws_Spells.Contains(effect.FormKey)) && !winningOverrideActorEffects.Contains(effect.FormKey)) {
+                                    if (patchRace.ActorEffect is null) {
+                                        patchRace.ActorEffect = new ExtendedList<IFormLinkGetter<ISpellRecordGetter>>();
+                                    }
+                                    patchRace.ActorEffect.Add(effectForm);
+                                }
+                            }
+                        }
+                        //forward unarmed damage modifiers.
+                        //if set, scale race unarmed damage with the same scaling factor applied to the winning override
+                        if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
+                            //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
+                            float baseRaceDamage = 4;
+                            bool found = false;
+                            //look for race in SkyFurry
+                            foreach (IRaceGetter baseRace in skyFurry.Races) {
+                                if (baseRace.FormKey.Equals(race.FormKey)) {
+                                    baseRaceDamage = baseRace.UnarmedDamage;
+                                    found = true;
+                                    break;
+                                }
+                            }
+                            //if it wasn't found there, look in this mod
+                            if (!found) {
+                                foreach (IRaceGetter baseRace in mod.Races) {
+                                    if (baseRace.FormKey.Equals(race.FormKey)) {
+                                        baseRaceDamage = baseRace.UnarmedDamage;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            //if it's not found there, look in this mod's masters
+                            if (!found) {
+                                foreach (var master in mod.MasterReferences) {
+                                    ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
+                                    if (masterMod != null) {
+                                        foreach (IRaceGetter baseRace in masterMod.Races) {
+                                            if (baseRace.FormKey.Equals(race.FormKey)) {
+                                                baseRaceDamage = baseRace.UnarmedDamage;
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!found) {
+                                    System.Console.WriteLine("Mystery race, ig");
+                                }
+                            }
+                            foreach (IRaceGetter baseRace in skyFurry.Races) {
+                                if (baseRace.FormKey.Equals(race.FormKey)) {
+                                    baseRaceDamage = baseRace.UnarmedDamage;
+                                    found = true;
+                                }
+                            }
+                            float scaleFactor = winningOverride.UnarmedDamage / baseRaceDamage;
+                            //apply scaling factor to SharpClaws damage 
+                            patchRace.UnarmedDamage = race.UnarmedDamage * scaleFactor;
+                        }
+                        else {
+                            patchRace.UnarmedDamage = race.UnarmedDamage;
+                        }
+                        processed++;
+                    }
+                }
+            }
+        }
     }
 }
+

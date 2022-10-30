@@ -11,7 +11,10 @@ using Mutagen.Bethesda.Plugins.Records;
 
 namespace SkyFurry_Visual_Patcher.Utilities {
     public static class LoadOrderUtilities {
-        public static (List<String>, List<ISkyrimModGetter>) getPatchableModsFromMaster(this ILoadOrder<IModListing<ISkyrimModGetter>> LoadOrder, String masterName, ISkyrimModGetter master) {
+        public static ISkyrimModGetter? getModByFileName(this ILoadOrder<IModListing<ISkyrimModGetter>> LoadOrder, string name) {
+            return LoadOrder[LoadOrder.Keys.Where(x => ((string)x.FileName).ToLower() == name.ToLower()).ToList().First()].Mod;
+        }
+        public static (List<String>, List<ISkyrimModGetter>) getModsFromMaster(this ILoadOrder<IModListing<ISkyrimModGetter>> LoadOrder, String masterName, ISkyrimModGetter master) {
             List<ISkyrimModGetter> modsToPatch = new();
             List<String> modNames = new();
             modsToPatch.Add(master);
