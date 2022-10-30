@@ -259,10 +259,31 @@ namespace SkyFurry_Visual_Patcher {
                     //if set, scale race unarmed damage with the same scaling factor applied to the winning override
                     if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
                         //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
-                        float baseRaceDamage = 1;
+                        float baseRaceDamage = 4;
+                        bool found = false;
+                        //look for race in SkyFurry
                         foreach (IRaceGetter baseRace in skyFurry.Races) {
                             if (baseRace.FormKey.Equals(race.FormKey)){
                                 baseRaceDamage = baseRace.UnarmedDamage;
+                                found = true;
+                            }
+                        }
+                        //if it wasn't found there, look in the masters
+                        if (!found) {
+                            //List<String> espsToCheck = new();
+                            foreach (var master in sharpClaws.MasterReferences) {
+                                ISkyrimModGetter? esp = state.LoadOrder.getModByFileName(master.Master.ToString());
+                                if (esp != null) {
+                                    foreach (IRaceGetter baseRace in esp.Races) {
+                                        if (baseRace.FormKey.Equals(race.FormKey)) {
+                                            baseRaceDamage = baseRace.UnarmedDamage;
+                                            found = true;
+                                        }
+                                    }
+                                }
+                            }
+                            if (!found) {
+                                System.Console.WriteLine("Mystery race, ig");
                             }
                         }
                         float scaleFactor = winningOverride.UnarmedDamage / baseRaceDamage;
