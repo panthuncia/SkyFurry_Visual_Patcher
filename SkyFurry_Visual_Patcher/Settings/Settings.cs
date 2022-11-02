@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SkyFurry_Visual_Patcher.Settings {
     class Settings {
-        public bool ignoreIdenticalToWinningOverride { get; set; } = true;
+        public bool ignoreIdenticalToWinningOverride { get; set; } = false;
         public bool patchNpcVisuals { get; set; } = true;
         public bool mergeRaces { get; set; } = true;
         public bool mergeFlowingFur { get; set; } = true;
