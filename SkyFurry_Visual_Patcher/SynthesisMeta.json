@@ -1,10 +1,11 @@
 {
-    "Nickname": "SF_Visual_Patcher",
-    "Visibility": "Visible",
-    "OneLineDescription": "Merges SkyFurry changes into the winning override.",
-    "LongDescription": "- Forwards SkyFurry's visual, racial, damage (SharpClaws), armor (DigiBoots), outfit (FlowingFur) changes to the winning override, allowing SkyFurry to be placed higher in the load order and eliminating the need for many manual patches. All modules can be disabled individually in settings.'",
-    "PreferredAutoVersioning": "Default",
-    "RequiredMods": [
-      "SkyFurry.esp"
-    ]
-  }
+  "Nickname": "SF_Visual_Patcher",
+  "Visibility": "Visible",
+  "OneLineDescription": "Merges SkyFurry changes into the winning override.",
+  "LongDescription": "- Forwards SkyFurry's visual, racial, damage (SharpClaws), armor (DigiBoots), outfit (FlowingFur) changes to the winning override, allowing SkyFurry to be placed higher in the load order and eliminating the need for many manual patches. All modules can be disabled individually in settings.'",
+  "PreferredAutoVersioning": "Default",
+  "RequiredMods": [
+    "SkyFurry.esp"
+  ],
+  "TargetedReleases": []
+}
