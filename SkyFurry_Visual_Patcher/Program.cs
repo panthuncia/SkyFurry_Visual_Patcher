@@ -31,11 +31,11 @@ namespace SkyFurry_Visual_Patcher {
         }
 
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
-            if (_settings.Value.mergeNpcVisuals) {
+            if (_settings.Value.patchNpcVisuals) {
                 patchNPCVisuals(state);
             }
             if (_settings.Value.mergeRaces) { 
-                patchRaceVisuals(state);
+                patchRaces(state);
             }
             if (_settings.Value.mergeFlowingFur) {
                 patchFlowingFur(state);
@@ -43,8 +43,13 @@ namespace SkyFurry_Visual_Patcher {
             if (_settings.Value.mergeSharpClaws) {
                 patchSharpClaws(state);
             }
+            if (_settings.Value.mergeDigiBoots) {
+                patchDigiBoots(state);
+            }
         }
-
+        /**
+         * void patchNPCVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all NPC edits made by SkyFurry.esp and anything which depends on it.
+         */
         private static void patchNPCVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //check for SkyFurry
             ISkyrimModGetter? SkyFurry = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
@@ -132,8 +137,13 @@ namespace SkyFurry_Visual_Patcher {
                 }
             }
         }
-
-        private static void patchRaceVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+        /**
+         * void patchRaces(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all race edits made by SkyFurry_FlowingFur.esp and anything which depends on it, 
+         * allowing some fields to be overwritten by mods outside of the SkyFurry dependancy lists if they're non-visual
+         * Lots of optimization is possible here, but much of what makes this function complex is to ensure compatability with mods that add content that should also be
+         * patched, or add new races which use that content.
+         */
+        private static void patchRaces(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             ISkyrimModGetter? skyFurry = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
             //get base game files for races, backwards to ensure that when we iterate through looking for records, we always get the highest priority override first.
             List<String> baseGameFileNames = new();
@@ -366,7 +376,7 @@ namespace SkyFurry_Visual_Patcher {
                                 patchRace.HairBipedObject = lastRaceReference.HairBipedObject;
                                 patchRace.BodyBipedObject = lastRaceReference.BodyBipedObject;
 
-                                //patch base stats, primarily for Dremora allow other mods to override.
+                                //patch base stats, allow other mods to override.
                                 if (baseRaceRecord is not null && winningOverrideRaceRecord.Regen.Equals(baseRaceRecord.Regen)) {
                                     patchRace.Regen.SetTo(lastRaceReference.Regen);
                                 }
@@ -448,7 +458,9 @@ namespace SkyFurry_Visual_Patcher {
                 }
             }
         }
-
+        /**
+         * void patchFlowingFur(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all edits made by SkyFurry_FlowingFur.esp and anything which depends on it.
+         */
         private static void patchFlowingFur(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //Now check for flowing fur addon and forward changes from it and anything that inherits from it
             ISkyrimModGetter? FlowingFur = state.LoadOrder.getModByFileName(_settings.Value.FlowingFurModName);
@@ -665,6 +677,132 @@ namespace SkyFurry_Visual_Patcher {
                         }
                         processed++;
                     }
+                }
+            }
+        }
+        private static void patchDigiBoots(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+            //Now check for flowing fur addon and forward changes from it and anything that inherits from it
+            ISkyrimModGetter? digiBoots = state.LoadOrder.getModByFileName(_settings.Value.DigibootsModName);
+            System.Console.WriteLine("\nChecking for digiboots...");
+            if (digiBoots != null) {
+                System.Console.WriteLine("Found!");
+                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.DigibootsModName, digiBoots);
+                int ModIndex = -1;
+                foreach (ISkyrimModGetter mod in modsToPatch) {
+                    int processed = 0;
+                    int ignored = 0;
+                    int totalArmors = mod.Armors.Count;
+                    int totalArmorAddons = mod.ArmorAddons.Count;
+                    //lists of armors and armor addons
+                    List<FormKey> modArmorFormIDs = mod.Armors.Select(x => x.FormKey).ToList();
+                    List<FormKey> modArmorAddonFormIDs = mod.ArmorAddons.Select(x => x.FormKey).ToList();
+                    List<IArmorGetter> winningArmorOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IArmorGetter>().Where(x => modArmorFormIDs.Contains(x.FormKey)).ToList();
+                    List<IArmorAddonGetter> winningArmorAddonOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IArmorAddonGetter>().Where(x => modArmorAddonFormIDs.Contains(x.FormKey)).ToList();
+                    ModIndex++;
+                    //get base game files
+                    List<String> baseGameFileNames = new();
+                    baseGameFileNames.Add("Dragonborn.esm");
+                    baseGameFileNames.Add("HearthFires.esm");
+                    baseGameFileNames.Add("Dawnguard.esm");
+                    baseGameFileNames.Add("Update.esm");
+                    baseGameFileNames.Add("Skyrim.esm");
+                    List<ISkyrimModGetter> baseGameFiles = new();
+                    foreach (String fileName in baseGameFileNames) {
+                        ISkyrimModGetter? file = state.LoadOrder.getModByFileName(fileName);
+                        if (file != null) {
+                            baseGameFiles.Add(file);
+                        }
+                    }
+                    System.Console.WriteLine("\nImporting armors from: " + modNames[ModIndex]);
+                    if (mod.Armors.Count > 0) {
+                        foreach (IArmorGetter armor in mod.Armors) {
+                            IArmorGetter? baseArmorRecord = null;
+                            bool armorInBaseGameFiles = false;
+                            bool found = false;
+                            //look for boots in base game
+                            foreach (ISkyrimModGetter? gameFile in baseGameFiles) {
+                                foreach (IArmorGetter baseArmor in gameFile.Armors) {
+                                    if (baseArmor.FormKey.Equals(armor.FormKey)) {
+                                        baseArmorRecord = baseArmor;
+                                        found = true;
+                                        armorInBaseGameFiles = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            //if it wasn't found there, look in this mod
+                            if (!found) {
+                                foreach (IArmorGetter baseArmor in mod.Armors) {
+                                    if (baseArmor.FormKey.Equals(armor.FormKey)) {
+                                        baseArmorRecord = baseArmor;
+                                        found = true;
+                                        break;
+                                    }
+                                }
+                            }
+                            //if it's not found there, look in this mod's masters
+                            if (!found) {
+                                foreach (var master in mod.MasterReferences) {
+                                    ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
+                                    if (masterMod != null) {
+                                        foreach (IArmorGetter baseArmor in masterMod.Armors) {
+                                            if (baseArmor.FormKey.Equals(armor.FormKey)) {
+                                                baseArmorRecord = baseArmor;
+                                                found = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!found) {
+                                    System.Console.WriteLine("Race not found in this file or master files, some functions will not work");
+                                }
+                            }
+                            if (processed % 10 == 0) {
+                                System.Console.WriteLine(processed + "/" + totalArmors + " armors");
+                            }
+                            IArmorGetter winningArmorOverride = winningArmorOverrides.Where(x => x.FormKey == armor.FormKey).First();
+                            Armor patchArmor = state.PatchMod.Armors.GetOrAddAsOverride(winningArmorOverride);
+
+                            if (patchArmor.BodyTemplate is null) { 
+                                patchArmor.BodyTemplate = new BodyTemplate();
+                            }
+                            if (armor.BodyTemplate is not null) {
+                                patchArmor.BodyTemplate.FirstPersonFlags = armor.BodyTemplate.FirstPersonFlags;
+                            }
+                            //patch world model
+                            if (armor.WorldModel is not null) {
+                                if(armor.WorldModel.Male is not null && armor.WorldModel.Female is not null) { 
+                                    patchArmor.WorldModel = new GenderedItem<ArmorModel?>(armor.WorldModel.Male.DeepCopy(), armor.WorldModel.Female.DeepCopy());
+                                }
+                                else if (armor.WorldModel.Male is not null && armor.WorldModel.Female is null) {
+                                    patchArmor.WorldModel = new GenderedItem<ArmorModel?>(armor.WorldModel.Male.DeepCopy(), null);
+                                }
+                                else if (armor.WorldModel.Male is null && armor.WorldModel.Female is not null) {
+                                    patchArmor.WorldModel = new GenderedItem<ArmorModel?>(null, armor.WorldModel.Female.DeepCopy());
+                                }
+                            }
+                            else {
+                                patchArmor.WorldModel = null;
+                            }
+                            //patch object bounds
+                            if (baseArmorRecord is not null && !armor.ObjectBounds.Equals(baseArmorRecord.ObjectBounds)) {
+                                patchArmor.ObjectBounds = armor.ObjectBounds.DeepCopy();
+                            }
+
+                            //remove unchanged armors
+                            if (patchArmor.Equals(winningArmorOverride)) {
+                                state.PatchMod.Armors.Remove(patchArmor);
+                                ignored++;
+                            }
+
+                            processed++;
+                        }
+                    }
+                    else {
+                        System.Console.WriteLine("No NPCs found");
+                    }
+                    System.Console.WriteLine("Ignoring " + ignored + " unchanged Outfits");
                 }
             }
         }
