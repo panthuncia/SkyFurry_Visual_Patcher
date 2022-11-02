@@ -680,6 +680,9 @@ namespace SkyFurry_Visual_Patcher {
                 }
             }
         }
+        /**
+         * void patchDigiBoots(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all edits made by SF_Digiboots.esp and anything which depends on it.
+         */
         private static void patchDigiBoots(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //Now check for flowing fur addon and forward changes from it and anything that inherits from it
             ISkyrimModGetter? digiBoots = state.LoadOrder.getModByFileName(_settings.Value.DigibootsModName);
