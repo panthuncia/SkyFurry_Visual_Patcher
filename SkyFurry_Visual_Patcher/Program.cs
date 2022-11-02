@@ -31,6 +31,14 @@ namespace SkyFurry_Visual_Patcher {
         }
 
         public static void RunPatch(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+            List<String> mods = new List<String>();
+            foreach (var mod in state.LoadOrder) {
+                mods.Add(mod.Key.Name);
+                System.Console.WriteLine(mod.Key.Name);
+            }
+            if (mods.Contains("Requiem for the Indifferent.esp")) {
+                System.Console.WriteLine("Load order contains \"Reqiem for the Indifferent.esp\", cannot run.");
+            }
             if (_settings.Value.patchNpcVisuals) {
                 patchNPCVisuals(state);
             }
@@ -174,7 +182,7 @@ namespace SkyFurry_Visual_Patcher {
                     int total = mod.Races.Count;
                     List<FormKey> modFormIDs = mod.Races.Select(x => x.FormKey).ToList();
                     List<IRaceGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IRaceGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
-                    System.Console.WriteLine("Processing mod: " + modNames[ModIndex]);
+                    System.Console.WriteLine("\nProcessing mod: " + modNames[ModIndex]);
                     foreach (IRaceGetter race in mod.Races) {
                         if (processed % 10 == 0) {
                             System.Console.WriteLine(processed + "/" + total + " races");
