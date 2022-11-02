@@ -19,7 +19,7 @@ This does exactly what it says- it forwards any FlowingFur added to outfits by S
 This module allows mods containing outfit edits to be placed after SkyFurry_FlowingFur.esp in the load order.
 
 # 4- Patching SharpClaws.
-This forwards all changes made by SkyFurry_SharpClaws.esp into the winning override. Optionally, it can also scale the unarmed damage to match the damage multiplier calculated from the winning override. For example, if base unarmed damage is 4, SharpClaws changes that to 7, another mod later sets it to 5, this module can be configured to calculate and set the resulting unarmed damage to 8.75, matching the scaling indicated by the mod that set it to 5.
+This forwards all changes made by SkyFurry_SharpClaws.esp into the winning override. Optionally, it can also scale the unarmed damage to match the damage multiplier calculated from the winning override. For example, if base unarmed damage is 4, SharpClaws changes that to 7, and another mod later sets it to 5, this module can be configured to calculate and set the resulting unarmed damage to 8.75, matching the scaling indicated by the mod that set it to 5.
 
 This module allows mods containing race edits to be placed after SkyFurry_SharpClaws.esp in the load order.
 
