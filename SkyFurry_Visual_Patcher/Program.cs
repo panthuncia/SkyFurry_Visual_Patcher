@@ -455,12 +455,12 @@ namespace SkyFurry_Visual_Patcher {
                                 }
 
                                 //patch relevant flags
-                                if (baseRaceRecord is not null && lastRaceReference.Flags.HasFlag(Race.Flag.Playable) && !baseRaceRecord.Flags.HasFlag(Race.Flag.Playable)) {
+                                if (baseRaceRecord is not null && lastRaceReference.Flags.HasFlag(Race.Flag.Playable) && !winningOverrideRaceRecord.Flags.HasFlag(Race.Flag.Playable)) {
                                     System.Console.WriteLine("Found a race which should be made playable, patching");
                                     //Flags cannot be set directly with setFlag(). That's annoying.
                                     patchRace.Flags = patchRace.Flags.SetFlag(Race.Flag.Playable, true);
                                 }
-                                if (baseRaceRecord is not null && lastRaceReference.Flags.HasFlag(Race.Flag.AllowMountedCombat) && !baseRaceRecord.Flags.HasFlag(Race.Flag.AllowMountedCombat)) {
+                                if (baseRaceRecord is not null && lastRaceReference.Flags.HasFlag(Race.Flag.AllowMountedCombat) && !winningOverrideRaceRecord.Flags.HasFlag(Race.Flag.AllowMountedCombat)) {
                                     patchRace.Flags = patchRace.Flags.SetFlag(Race.Flag.AllowMountedCombat, true);
                                 }
                                 //we're done, break out of loop
@@ -539,7 +539,7 @@ namespace SkyFurry_Visual_Patcher {
                                 }
                             }
                             //remove unchanged outfits
-                            if (patchOutfit.Equals(winningOverride)) {
+                            if (_settings.Value.ignoreIdenticalToWinningOverride && patchOutfit.Equals(winningOverride)) {
                                 state.PatchMod.Outfits.Remove(outfit);
                                 ignored++;
                             }
@@ -829,7 +829,7 @@ namespace SkyFurry_Visual_Patcher {
                             }
 
                             //remove unchanged armors
-                            if (patchArmor.Equals(winningArmorOverride)) {
+                            if (_settings.Value.ignoreIdenticalToWinningOverride && patchArmor.Equals(winningArmorOverride)) {
                                 state.PatchMod.Armors.Remove(patchArmor);
                                 ignored++;
                             }
