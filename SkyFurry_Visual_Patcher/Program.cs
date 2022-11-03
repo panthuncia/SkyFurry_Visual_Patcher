@@ -614,8 +614,6 @@ namespace SkyFurry_Visual_Patcher {
             System.Console.WriteLine("\nChecking for sharp claws...");
             if (skyFurry is not null && sharpClaws is not null) {
                 System.Console.WriteLine("Found!");
-                List<FormKey> modFormIDs = sharpClaws.Races.Select(x => x.FormKey).ToList();
-                List<IRaceGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IRaceGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                 //list sharpclaws spells
                 //patch races
                 (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.SharpClawsModName, sharpClaws);
@@ -652,6 +650,8 @@ namespace SkyFurry_Visual_Patcher {
                     }
                     int processed = 0;
                     int total = mod.Races.Count;
+                    List<FormKey> modFormIDs = mod.Races.Select(x => x.FormKey).ToList();
+                    List<IRaceGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IRaceGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
                     foreach (IRaceGetter race in mod.Races) {
                         if (race.EditorID is not null) {
                             System.Console.WriteLine("Race: " + race.EditorID.ToString());
@@ -662,14 +662,17 @@ namespace SkyFurry_Visual_Patcher {
                         if (processed % 10 == 0) {
                             System.Console.WriteLine(processed + "/" + total + " Races");
                         }
+                        
                         IRaceGetter winningOverride = winningOverrides.Where(x => x.FormKey == race.FormKey).First();
                         Race patchRace = state.PatchMod.Races.GetOrAddAsOverride(winningOverride);
 
                         //patch impact data
+                        
                         patchRace.ImpactDataSet.SetTo(race.ImpactDataSet);
 
                         //patch actor effects
                         //list winning override actor effects
+                        System.Console.WriteLine("Patching actor effects");
                         List<FormKey> winningOverrideActorEffects = new();
                         if (winningOverride.ActorEffect is not null) {
                             //another IFormLinkGetter
@@ -681,6 +684,7 @@ namespace SkyFurry_Visual_Patcher {
                             }
                         }
                         //check every race effect record in the current mod, and if it is in SkyFurry_SharpClaws.esp or anything that inherits from it but is not in the winning override, add it to the patch
+                        
                         if (race.ActorEffect is not null) {
                             foreach (IFormLinkGetter<ISpellRecordGetter> effectForm in race.ActorEffect) {
                                 ISpellRecordGetter? effect = effectForm.TryResolve(state.LinkCache);
@@ -694,6 +698,7 @@ namespace SkyFurry_Visual_Patcher {
                         }
                         //forward unarmed damage modifiers.
                         //if set, scale race unarmed damage with the same scaling factor applied to the winning override
+                        System.Console.WriteLine("Forwarding unarmed damage");
                         if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
                             //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
                             float baseRaceDamage = 4;
