@@ -619,7 +619,10 @@ namespace SkyFurry_Visual_Patcher {
                 //list sharpclaws spells
                 //patch races
                 (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.SharpClawsModName, sharpClaws);
+                int modIndex = -1;
                 foreach (ISkyrimModGetter mod in modsToPatch) {
+                    modIndex++;
+                    System.Console.WriteLine("\nPatching mod: " + modNames[modIndex]);
                     List<FormKey> sharpClaws_Spells = new();
                     //get all of the spells added by this mod
                     foreach (ISpellGetter spell in mod.Spells) {
@@ -628,7 +631,7 @@ namespace SkyFurry_Visual_Patcher {
                     //get all of the spells added by this mods masters, as long as that master also has SharpClaws as a master.
                     //This could add unrelated spells, but shouldn't cause many issues, but there could be some problematic edge cases.
                     //it is necessary in order to support new SharpClaws spells added by extensions to SharpClaws that inherit from it.  
-                    foreach (var master in mod.MasterReferences) {
+                    foreach (IMasterReferenceGetter master in mod.MasterReferences) {
                         ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
                         if (masterMod != null) {
                             //to avoid pulling every spell from the base game and every mod we might have a SharpClaws patch for, we check that the master mod itself inherits from SharpClaws.
@@ -650,6 +653,12 @@ namespace SkyFurry_Visual_Patcher {
                     int processed = 0;
                     int total = mod.Races.Count;
                     foreach (IRaceGetter race in mod.Races) {
+                        if (race.EditorID is not null) {
+                            System.Console.WriteLine("Race: " + race.EditorID.ToString());
+                        }
+                        else {
+                            System.Console.WriteLine("Found race with null EditorID! FormKey:" + race.FormKey.ToString());
+                        }
                         if (processed % 10 == 0) {
                             System.Console.WriteLine(processed + "/" + total + " Races");
                         }
