@@ -152,7 +152,14 @@ namespace SkyFurry_Visual_Patcher {
          * patched, or add new races which use that content.
          */
         private static void patchRaces(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
-            ISkyrimModGetter? skyFurry = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
+            ISkyrimModGetter? skyFurry = null;
+            try {
+                skyFurry = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
+            }
+            catch {
+                System.Console.WriteLine(_settings.Value.SkyFurryBaseModName+" not found in load order");
+                return;
+            }
             //get base game files for races, backwards to ensure that when we iterate through looking for records, we always get the highest priority override first.
             List<String> baseGameFileNames = new();
             baseGameFileNames.Add("Dragonborn.esm");
@@ -471,7 +478,14 @@ namespace SkyFurry_Visual_Patcher {
          */
         private static void patchFlowingFur(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //Now check for flowing fur addon and forward changes from it and anything that inherits from it
-            ISkyrimModGetter? FlowingFur = state.LoadOrder.getModByFileName(_settings.Value.FlowingFurModName);
+            ISkyrimModGetter? FlowingFur = null;
+            try {
+                FlowingFur = state.LoadOrder.getModByFileName(_settings.Value.FlowingFurModName);
+            }
+            catch {
+                System.Console.WriteLine(_settings.Value.FlowingFurModName+" not found in load order");
+                return;
+            }
             System.Console.WriteLine("\nChecking for flowing fur...");
             if (FlowingFur != null) {
                 System.Console.WriteLine("Found!");
@@ -546,18 +560,24 @@ namespace SkyFurry_Visual_Patcher {
          * patched, or add new races which use that content.
          */
         private static void patchSharpClaws(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
-            ISkyrimModGetter? sharpClaws = state.LoadOrder.getModByFileName(_settings.Value.SharpClawsModName);
-            if (sharpClaws == null) {
-                System.Console.WriteLine(_settings.Value.SharpClawsModName+" not found");
+            ISkyrimModGetter? sharpClaws = null;
+            try {
+                sharpClaws = state.LoadOrder.getModByFileName(_settings.Value.SharpClawsModName);
+            }
+            catch {
+                System.Console.WriteLine(_settings.Value.SharpClawsModName + " not found in load order");
                 return;
             }
-            ISkyrimModGetter? skyFurry = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
-            if (skyFurry == null) {
-                System.Console.WriteLine(_settings.Value.SkyFurryBaseModName+" not found");
+            ISkyrimModGetter? skyFurry = null;
+            try {
+                skyFurry = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
+            }
+            catch {
+                System.Console.WriteLine(_settings.Value.SkyFurryBaseModName + " not found in load order");
                 return;
             }
             System.Console.WriteLine("\nChecking for sharp claws...");
-            if (sharpClaws != null) {
+            if (skyFurry is not null && sharpClaws is not null) {
                 System.Console.WriteLine("Found!");
                 List<FormKey> modFormIDs = sharpClaws.Races.Select(x => x.FormKey).ToList();
                 List<IRaceGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IRaceGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
@@ -693,7 +713,14 @@ namespace SkyFurry_Visual_Patcher {
          */
         private static void patchDigiBoots(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //Now check for flowing fur addon and forward changes from it and anything that inherits from it
-            ISkyrimModGetter? digiBoots = state.LoadOrder.getModByFileName(_settings.Value.DigibootsModName);
+            ISkyrimModGetter? digiBoots = null;
+            try {
+                digiBoots = state.LoadOrder.getModByFileName(_settings.Value.DigibootsModName);
+            }
+            catch {
+                System.Console.WriteLine(_settings.Value.DigibootsModName+" not found in load order");
+                return;
+            }
             System.Console.WriteLine("\nChecking for digiboots...");
             if (digiBoots != null) {
                 System.Console.WriteLine("Found!");
