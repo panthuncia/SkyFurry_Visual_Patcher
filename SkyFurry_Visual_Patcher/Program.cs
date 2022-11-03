@@ -40,7 +40,7 @@ namespace SkyFurry_Visual_Patcher {
             if (mods.Contains("Requiem for the Indifferent.esp")) {
                 System.Console.WriteLine("\"Reqiem for the Indifferent.esp\", did not get filtered out, cannot run.");
             }
-            System.Console.WriteLine("Running version: 0.5.3");
+            System.Console.WriteLine("Running version: 0.5.4");
             if (_settings.Value.patchNpcVisuals) {
                 patchNPCVisuals(state);
                 patchTextureSets(state);
