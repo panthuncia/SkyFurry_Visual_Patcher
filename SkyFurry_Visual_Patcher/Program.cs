@@ -9,6 +9,7 @@ using SkyFurry_Visual_Patcher.Utilities;
 using SkyFurry_Visual_Patcher.Settings;
 using System.Text;
 using Mutagen.Bethesda.Strings;
+using System.Reactive.Concurrency;
 
 namespace SkyFurry_Visual_Patcher {
     public class Program {
@@ -37,10 +38,16 @@ namespace SkyFurry_Visual_Patcher {
                 System.Console.WriteLine(mod.Key.Name);
             }
             if (mods.Contains("Requiem for the Indifferent.esp")) {
-                System.Console.WriteLine("Load order contains \"Reqiem for the Indifferent.esp\", cannot run.");
+                System.Console.WriteLine("\"Reqiem for the Indifferent.esp\", did not get filtered out, cannot run.");
             }
+            System.Console.WriteLine("Running version: 0.5.3");
             if (_settings.Value.patchNpcVisuals) {
                 patchNPCVisuals(state);
+                patchTextureSets(state);
+            }
+            if (_settings.Value.mergeArmors) {
+                patchArmorAddons(state);
+                patchArmors(state);
             }
             if (_settings.Value.mergeRaces) { 
                 patchRaces(state);
@@ -51,12 +58,9 @@ namespace SkyFurry_Visual_Patcher {
             if (_settings.Value.mergeSharpClaws) {
                 patchSharpClaws(state);
             }
-            if (_settings.Value.mergeDigiBoots) {
-                patchDigiBoots(state);
-            }
         }
         /**
-         * void patchNPCVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all NPC edits made by SkyFurry.esp and anything which depends on it.
+         * void patchNPCVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all NPC edits made by YiffyAgeConsolidated.esp and anything which depends on it.
          */
         private static void patchNPCVisuals(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
             //check for SkyFurry
@@ -69,10 +73,6 @@ namespace SkyFurry_Visual_Patcher {
             System.Console.WriteLine("Patching base SkyFurry visuals\n");
             //get list of mods which inherit from SkyFurry, as these may contain NPCs we need to patch
             (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.SkyFurryBaseModName, SkyFurry);
-            System.Console.WriteLine("\nForwarding visuals from:");
-            foreach (String modName in modNames) {
-                System.Console.WriteLine(modName);
-            }
             int ModIndex = -1;
             foreach (ISkyrimModGetter mod in modsToPatch) {
                 int processed = 0;
@@ -145,8 +145,43 @@ namespace SkyFurry_Visual_Patcher {
                 }
             }
         }
+        private static void patchTextureSets(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+            //check for SkyFurry
+            ISkyrimModGetter? SkyFurry = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
+
+            if (SkyFurry == null) {
+                System.Console.WriteLine(_settings.Value.SkyFurryBaseModName + " not found");
+                return;
+            }
+            System.Console.WriteLine("Patching SkyFurry textures\n");
+            //get list of mods which inherit from SkyFurry, as these may contain NPCs we need to patch
+            (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.SkyFurryBaseModName, SkyFurry);
+            int ModIndex = -1;
+            foreach (ISkyrimModGetter mod in modsToPatch) {
+                int processed = 0;
+                int ignored = 0;
+                int total = mod.TextureSets.Count;
+                List<FormKey> modFormIDs = mod.TextureSets.Select(x => x.FormKey).ToList();
+                List<ITextureSetGetter> winningOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<ITextureSetGetter>().Where(x => modFormIDs.Contains(x.FormKey)).ToList();
+                ModIndex++;
+                System.Console.WriteLine("\nImporting textures from: " + modNames[ModIndex]);
+                if (mod.TextureSets.Count > 0) {
+                    foreach (ITextureSetGetter textureSet in mod.TextureSets) {
+                        if (processed % 10 == 0) {
+                            System.Console.WriteLine(processed + "/" + total + " textures");
+                        }
+                        ITextureSetGetter winningOverride = winningOverrides.Where(x => x.FormKey == textureSet.FormKey).First();
+                        TextureSet patchTextureSet = state.PatchMod.TextureSets.GetOrAddAsOverride(winningOverride);
+
+                        //patch textures
+                        patchTextureSet = textureSet.DeepCopy();
+                        processed++;
+                    }
+                }
+            }
+        }
         /**
-         * void patchRaces(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all race edits made by SkyFurry_FlowingFur.esp and anything which depends on it, 
+         * void patchRaces(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all race edits made by YiffyAgeConsolidated.esp and anything which depends on it, 
          * allowing some fields to be overwritten by mods outside of the SkyFurry dependancy lists if they're non-visual
          * Lots of optimization is possible here, but much of what makes this function complex is to ensure compatability with mods that add content that should also be
          * patched, or add new races which use that content.
@@ -709,33 +744,29 @@ namespace SkyFurry_Visual_Patcher {
             }
         }
         /**
-         * void patchDigiBoots(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all edits made by SF_Digiboots.esp and anything which depends on it.
+         * void patchArmors(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all armor edits made by YiffyAgeConsolidated.esp and anything which depends on it.
          */
-        private static void patchDigiBoots(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
-            //Now check for flowing fur addon and forward changes from it and anything that inherits from it
-            ISkyrimModGetter? digiBoots = null;
+        private static void patchArmors(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+            ISkyrimModGetter? yiffyAge = null;
             try {
-                digiBoots = state.LoadOrder.getModByFileName(_settings.Value.DigibootsModName);
+                yiffyAge = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
             }
             catch {
-                System.Console.WriteLine(_settings.Value.DigibootsModName+" not found in load order");
+                System.Console.WriteLine(_settings.Value.SkyFurryBaseModName+" not found in load order");
                 return;
             }
             System.Console.WriteLine("\nChecking for digiboots...");
-            if (digiBoots != null) {
+            if (yiffyAge != null) {
                 System.Console.WriteLine("Found!");
-                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.DigibootsModName, digiBoots);
+                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.SkyFurryBaseModName, yiffyAge);
                 int ModIndex = -1;
                 foreach (ISkyrimModGetter mod in modsToPatch) {
                     int processed = 0;
                     int ignored = 0;
                     int totalArmors = mod.Armors.Count;
-                    int totalArmorAddons = mod.ArmorAddons.Count;
                     //lists of armors and armor addons
                     List<FormKey> modArmorFormIDs = mod.Armors.Select(x => x.FormKey).ToList();
-                    List<FormKey> modArmorAddonFormIDs = mod.ArmorAddons.Select(x => x.FormKey).ToList();
                     List<IArmorGetter> winningArmorOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IArmorGetter>().Where(x => modArmorFormIDs.Contains(x.FormKey)).ToList();
-                    List<IArmorAddonGetter> winningArmorAddonOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IArmorAddonGetter>().Where(x => modArmorAddonFormIDs.Contains(x.FormKey)).ToList();
                     ModIndex++;
                     //get base game files
                     List<String> baseGameFileNames = new();
@@ -757,7 +788,7 @@ namespace SkyFurry_Visual_Patcher {
                             IArmorGetter? baseArmorRecord = null;
                             bool armorInBaseGameFiles = false;
                             bool found = false;
-                            //look for boots in base game
+                            //look for armor in base game
                             foreach (ISkyrimModGetter? gameFile in baseGameFiles) {
                                 foreach (IArmorGetter baseArmor in gameFile.Armors) {
                                     if (baseArmor.FormKey.Equals(armor.FormKey)) {
@@ -802,13 +833,14 @@ namespace SkyFurry_Visual_Patcher {
                             IArmorGetter winningArmorOverride = winningArmorOverrides.Where(x => x.FormKey == armor.FormKey).First();
                             Armor patchArmor = state.PatchMod.Armors.GetOrAddAsOverride(winningArmorOverride);
 
+                            //patch first person flags, override
                             if (patchArmor.BodyTemplate is null) { 
                                 patchArmor.BodyTemplate = new BodyTemplate();
                             }
                             if (armor.BodyTemplate is not null) {
                                 patchArmor.BodyTemplate.FirstPersonFlags = armor.BodyTemplate.FirstPersonFlags;
                             }
-                            //patch world model
+                            //patch world model, override
                             if (armor.WorldModel is not null) {
                                 if(armor.WorldModel.Male is not null && armor.WorldModel.Female is not null) { 
                                     patchArmor.WorldModel = new GenderedItem<ArmorModel?>(armor.WorldModel.Male.DeepCopy(), armor.WorldModel.Female.DeepCopy());
@@ -823,10 +855,13 @@ namespace SkyFurry_Visual_Patcher {
                             else {
                                 patchArmor.WorldModel = null;
                             }
-                            //patch object bounds
+                            //patch object bounds, override if it's not the vanilla bounds
                             if (baseArmorRecord is not null && !armor.ObjectBounds.Equals(baseArmorRecord.ObjectBounds)) {
                                 patchArmor.ObjectBounds = armor.ObjectBounds.DeepCopy();
                             }
+
+                            //patch armature model, override
+                            patchArmor.Armature.SetTo(armor.Armature);
 
                             //remove unchanged armors
                             if (_settings.Value.ignoreIdenticalToWinningOverride && patchArmor.Equals(winningArmorOverride)) {
@@ -838,7 +873,69 @@ namespace SkyFurry_Visual_Patcher {
                         }
                     }
                     else {
-                        System.Console.WriteLine("No NPCs found");
+                        System.Console.WriteLine("No armors found");
+                    }
+                    System.Console.WriteLine("Ignoring " + ignored + " unchanged Outfits");
+                }
+            }
+        }
+        /**
+         * void patchArmorAddons(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) forwards all armor addon edits made by YiffyAgeConsolidated.esp and anything which depends on it.
+         */
+        private static void patchArmorAddons(IPatcherState<ISkyrimMod, ISkyrimModGetter> state) {
+            ISkyrimModGetter? yiffyAge = null;
+            try {
+                yiffyAge = state.LoadOrder.getModByFileName(_settings.Value.SkyFurryBaseModName);
+            }
+            catch {
+                System.Console.WriteLine(_settings.Value.SkyFurryBaseModName + " not found in load order");
+                return;
+            }
+            System.Console.WriteLine("\nChecking for digiboots...");
+            if (yiffyAge != null) {
+                System.Console.WriteLine("Found!");
+                (List<String> modNames, List<ISkyrimModGetter> modsToPatch) = state.LoadOrder.getModsFromMasterIncludingMaster(_settings.Value.SkyFurryBaseModName, yiffyAge);
+                int ModIndex = -1;
+                foreach (ISkyrimModGetter mod in modsToPatch) {
+                    int processed = 0;
+                    int ignored = 0;
+                    int totalArmorAddons = mod.ArmorAddons.Count;
+                    //lists of armors and armor addons
+                    List<FormKey> modArmorAddonFormIDs = mod.ArmorAddons.Select(x => x.FormKey).ToList();
+                    List<IArmorAddonGetter> winningArmorAddonOverrides = state.LoadOrder.PriorityOrder.WinningOverrides<IArmorAddonGetter>().Where(x => modArmorAddonFormIDs.Contains(x.FormKey)).ToList();
+                    ModIndex++;
+                    System.Console.WriteLine("\nImporting armor addons from: " + modNames[ModIndex]);
+                    if (mod.ArmorAddons.Count > 0) {
+                        foreach (IArmorAddonGetter armorAddon in mod.ArmorAddons) {
+                            
+                            if (processed % 10 == 0) {
+                                System.Console.WriteLine(processed + "/" + totalArmorAddons + " armors");
+                            }
+                            IArmorAddonGetter winningArmorAddonOverride = winningArmorAddonOverrides.Where(x => x.FormKey == armorAddon.FormKey).First();
+                            ArmorAddon patchArmorAddon = state.PatchMod.ArmorAddons.GetOrAddAsOverride(winningArmorAddonOverride);
+
+                            //patch first person flags, override
+                            if (patchArmorAddon.BodyTemplate is null) {
+                                patchArmorAddon.BodyTemplate = new BodyTemplate();
+                            }
+                            if (armorAddon.BodyTemplate is not null) {
+                                patchArmorAddon.BodyTemplate.FirstPersonFlags = armorAddon.BodyTemplate.FirstPersonFlags;
+                            }
+
+                            //patch additional races, override
+                            patchArmorAddon.AdditionalRaces.SetTo(armorAddon.AdditionalRaces);
+
+                            //remove unchanged armors
+                            if (_settings.Value.ignoreIdenticalToWinningOverride && patchArmorAddon.Equals(winningArmorAddonOverride)) {
+                                state.PatchMod.Armors.Remove(patchArmorAddon);
+                                ignored++;
+                            }
+
+                            processed++;
+                        }
+                    }
+                    else {
+                        System.Console.WriteLine("No armors found");
                     }
                     System.Console.WriteLine("Ignoring " + ignored + " unchanged Outfits");
                 }
