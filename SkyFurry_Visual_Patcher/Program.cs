@@ -10,6 +10,7 @@ using SkyFurry_Visual_Patcher.Settings;
 using System.Text;
 using Mutagen.Bethesda.Strings;
 using System.Reactive.Concurrency;
+using Mutagen.Bethesda.Plugins.Order;
 
 namespace SkyFurry_Visual_Patcher {
     public class Program {
@@ -611,6 +612,8 @@ namespace SkyFurry_Visual_Patcher {
                 System.Console.WriteLine(_settings.Value.SkyFurryBaseModName + " not found in load order");
                 return;
             }
+            List<IModListing<ISkyrimModGetter>> modsBackwards = state.LoadOrder.PriorityOrder.ToList();
+            modsBackwards.Reverse();
             System.Console.WriteLine("\nChecking for sharp claws...");
             if (skyFurry is not null && sharpClaws is not null) {
                 System.Console.WriteLine("Found!");
@@ -622,11 +625,12 @@ namespace SkyFurry_Visual_Patcher {
                     modIndex++;
                     System.Console.WriteLine("\nPatching mod: " + modNames[modIndex]);
                     List<FormKey> sharpClaws_Spells = new();
+
                     //get all of the spells added by this mod
                     foreach (ISpellGetter spell in mod.Spells) {
                         sharpClaws_Spells.Add(spell.FormKey);
                     }
-                    //get all of the spells added by this mods masters, as long as that master also has SharpClaws as a master.
+                    //get all of the spells (and races) added by this mods masters, as long as that master also has SharpClaws as a master.
                     //This could add unrelated spells, but shouldn't cause many issues, but there could be some problematic edge cases.
                     //it is necessary in order to support new SharpClaws spells added by extensions to SharpClaws that inherit from it.  
                     foreach (IMasterReferenceGetter master in mod.MasterReferences) {
@@ -699,7 +703,21 @@ namespace SkyFurry_Visual_Patcher {
                         //forward unarmed damage modifiers.
                         //if set, scale race unarmed damage with the same scaling factor applied to the winning override
                         System.Console.WriteLine("Forwarding unarmed damage");
+                        List<FormKey> seenRaces = new();
                         if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
+
+                            //don't scale damage if the winning override for this race inherits from SharpClaws- this stops self-multiplication
+                            foreach (IModListing<ISkyrimModGetter> modListing in modsBackwards) {
+                                if (modListing.Mod is not null && modListing.Mod.Races.FormKeys.Contains(race.FormKey)){
+                                    foreach (IMasterReferenceGetter master in modListing.Mod.MasterReferences) {
+                                        if (master.Master.Equals(sharpClaws.ModKey)) {
+                                            System.Console.WriteLine("Skipping damage multiplication due to SharpClaws winning override");
+                                            return;
+                                        }
+                                    }
+                                    break;
+                                }
+                            }
                             //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
                             float baseRaceDamage = 4;
                             bool found = false;
