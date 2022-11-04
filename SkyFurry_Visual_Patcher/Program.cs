@@ -612,8 +612,7 @@ namespace SkyFurry_Visual_Patcher {
                 System.Console.WriteLine(_settings.Value.SkyFurryBaseModName + " not found in load order");
                 return;
             }
-            List<IModListing<ISkyrimModGetter>> modsBackwards = state.LoadOrder.PriorityOrder.ToList();
-            modsBackwards.Reverse();
+            IEnumerable<IModListing<ISkyrimModGetter>> modsBackwards = state.LoadOrder.PriorityOrder;
             System.Console.WriteLine("\nChecking for sharp claws...");
             if (skyFurry is not null && sharpClaws is not null) {
                 System.Console.WriteLine("Found!");
@@ -707,65 +706,68 @@ namespace SkyFurry_Visual_Patcher {
                         if (_settings.Value.scaleUnarmedDamageWithWinningOverride) {
 
                             //don't scale damage if the winning override for this race inherits from SharpClaws- this stops self-multiplication
+                            bool skip = false;
                             foreach (IModListing<ISkyrimModGetter> modListing in modsBackwards) {
-                                if (modListing.Mod is not null && modListing.Mod.Races.FormKeys.Contains(race.FormKey)){
-                                    foreach (IMasterReferenceGetter master in modListing.Mod.MasterReferences) {
+                                if (!modListing.ModKey.ToString().Equals("Synthesis.esp") && modListing.Mod is not null && modListing.Mod.Races.FormKeys.Contains(race.FormKey)) {
+                                    foreach (IMasterReferenceGetter master in modListing.Mod.ModHeader.MasterReferences) {
                                         if (master.Master.Equals(sharpClaws.ModKey)) {
                                             System.Console.WriteLine("Skipping damage multiplication due to SharpClaws winning override");
-                                            return;
+                                            skip = true;
                                         }
                                     }
                                     break;
                                 }
                             }
-                            //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
-                            float baseRaceDamage = 4;
-                            bool found = false;
-                            //look for race in SkyFurry
-                            foreach (IRaceGetter baseRace in skyFurry.Races) {
-                                if (baseRace.FormKey.Equals(race.FormKey)) {
-                                    baseRaceDamage = baseRace.UnarmedDamage;
-                                    found = true;
-                                    break;
-                                }
-                            }
-                            //if it wasn't found there, look in this mod
-                            if (!found) {
-                                foreach (IRaceGetter baseRace in mod.Races) {
+                            if (!skip) {
+                                //pull base damage values from SkyFurry.esp and calculate scaling factor from the winning override
+                                float baseRaceDamage = 4;
+                                bool found = false;
+                                //look for race in SkyFurry
+                                foreach (IRaceGetter baseRace in skyFurry.Races) {
                                     if (baseRace.FormKey.Equals(race.FormKey)) {
                                         baseRaceDamage = baseRace.UnarmedDamage;
                                         found = true;
                                         break;
                                     }
                                 }
-                            }
-                            //if it's not found there, look in this mod's masters
-                            if (!found) {
-                                foreach (var master in mod.MasterReferences) {
-                                    ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
-                                    if (masterMod != null) {
-                                        foreach (IRaceGetter baseRace in masterMod.Races) {
-                                            if (baseRace.FormKey.Equals(race.FormKey)) {
-                                                baseRaceDamage = baseRace.UnarmedDamage;
-                                                found = true;
-                                                break;
-                                            }
+                                //if it wasn't found there, look in this mod
+                                if (!found) {
+                                    foreach (IRaceGetter baseRace in mod.Races) {
+                                        if (baseRace.FormKey.Equals(race.FormKey)) {
+                                            baseRaceDamage = baseRace.UnarmedDamage;
+                                            found = true;
+                                            break;
                                         }
                                     }
                                 }
+                                //if it's not found there, look in this mod's masters
                                 if (!found) {
-                                    System.Console.WriteLine("Mystery race, ig");
+                                    foreach (var master in mod.MasterReferences) {
+                                        ISkyrimModGetter? masterMod = state.LoadOrder.getModByFileName(master.Master.ToString());
+                                        if (masterMod != null) {
+                                            foreach (IRaceGetter baseRace in masterMod.Races) {
+                                                if (baseRace.FormKey.Equals(race.FormKey)) {
+                                                    baseRaceDamage = baseRace.UnarmedDamage;
+                                                    found = true;
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                    }
+                                    if (!found) {
+                                        System.Console.WriteLine("Mystery race, ig");
+                                    }
                                 }
-                            }
-                            foreach (IRaceGetter baseRace in skyFurry.Races) {
-                                if (baseRace.FormKey.Equals(race.FormKey)) {
-                                    baseRaceDamage = baseRace.UnarmedDamage;
-                                    found = true;
+                                foreach (IRaceGetter baseRace in skyFurry.Races) {
+                                    if (baseRace.FormKey.Equals(race.FormKey)) {
+                                        baseRaceDamage = baseRace.UnarmedDamage;
+                                        found = true;
+                                    }
                                 }
+                                float scaleFactor = winningOverride.UnarmedDamage / baseRaceDamage;
+                                //apply scaling factor to SharpClaws damage 
+                                patchRace.UnarmedDamage = race.UnarmedDamage * scaleFactor;
                             }
-                            float scaleFactor = winningOverride.UnarmedDamage / baseRaceDamage;
-                            //apply scaling factor to SharpClaws damage 
-                            patchRace.UnarmedDamage = race.UnarmedDamage * scaleFactor;
                         }
                         else {
                             patchRace.UnarmedDamage = race.UnarmedDamage;

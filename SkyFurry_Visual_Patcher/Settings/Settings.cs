@@ -12,7 +12,7 @@ namespace SkyFurry_Visual_Patcher.Settings {
         public bool mergeRaces { get; set; } = true;
         public bool mergeFlowingFur { get; set; } = true;
         public bool mergeSharpClaws { get; set; } = true;
-        public bool scaleUnarmedDamageWithWinningOverride { get; set; } = true;
+        public bool scaleUnarmedDamageWithWinningOverride { get; set; } = false;
         public String SkyFurryBaseModName { get; set; } = "YiffyAgeConsolidated.esp";
         public String FlowingFurModName { get; set; } = "SkyFurry_FlowingFur.esp";
         public String SharpClawsModName { get; set; } = "SkyFurry_SharpClaws.esp";
